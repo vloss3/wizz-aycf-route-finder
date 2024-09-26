@@ -1,0 +1,12 @@
+Privacy Policy for AYCF Route Finder
+
+This extension does not collect any user data whatsoever.
+
+We are committed to protecting your privacy. Our extension operates entirely on your device and does not transmit, store, or process any personal information or user data.
+
+Key points:
+- No data collection: We do not collect, store, or transmit any user data.
+- No tracking: We do not use any tracking technologies or analytics.
+- No personal information: We do not request or access any personal information.
+
+Last updated: 26-09-2024

@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "AYCF Route Finder",
+  "description": "Simple(<1mb) Chrome extension to find all available routes on Wizz AYCF (All-You-Can-Fly). Not affiliated with Wizz Air.",
+  "version": "1.0",
+  "permissions": [
+    "webRequest",
+    "activeTab",
+    "https://multipass.wizzair.com/*",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://multipass.wizzair.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://multipass.wizzair.com/*"],
+      "js": ["content.js"]
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wizz Air Route Preview</title>
+  <link rel="stylesheet" href="css/bulma.min.css">
+  <style>
+    body {
+      min-width: 600px;
+    }
+    .container {
+      width: 100%;
+      max-width: none;
+    }
+  </style>
+</head>
+<body>
+  <section class="section">
+    <div class="container">
+      <div class="title">
+        <h1 class="is-size-5">Wizz AYCF Route Finder</h1>
+        <p class="is-size-7 mt-2">
+          <a href="https://github.com/vloss3/wizz-aycf-route-finder" target="_blank">GitHub</a> | 
+          <a href="https://discord.gg/k3eRaSBez4" target="_blank">Feedback (Discord)</a>
+        </p>
+      </div>
+      <div class="field">
+        <label class="label">Departure Airport</label>
+        <div class="control">
+          <input id="airport-input" class="input" type="text" placeholder="Enter airport code (e.g., LTN)">
+        </div>
+      </div>
+      <div class="field">
+        <label class="label">Departure Date</label>
+        <div class="control">
+          <select id="date-select" class="select">
+  
+          </select>
+        </div>
+      </div>
+      <button id="search-flights" class="button is-link mb-4">Check Routes</button>
+    
+      <div class="route-list">
+        <div class="columns is-multiline" id="route-columns">
+          <!-- Routes will be dynamically inserted here -->
+        </div>
+      </div>
+    </div>
+    <p class="is-size-6 mt-3"><b>Note:</b> First go to the Wizzair Multipass page, enter a random route and press Search. Then you can use this extension.</p>
+  </section>
+  <script src="popup.js"></script>
+</body>
+</html>
