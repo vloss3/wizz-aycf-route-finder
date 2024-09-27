@@ -5,9 +5,7 @@
   "version": "1.0",
   "permissions": [
     "webRequest",
-    "activeTab",
-    "https://multipass.wizzair.com/*",
-    "storage"
+    "activeTab"
   ],
   "host_permissions": [
     "https://multipass.wizzair.com/*"
