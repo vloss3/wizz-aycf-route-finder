@@ -42,6 +42,8 @@ function getDynamicUrl() {
 
 async function checkRoute(origin, destination, date) {
   try {
+    await new Promise(resolve => setTimeout(resolve, 200));
+
     const dynamicUrl = await getDynamicUrl();
 
     const data = {
@@ -160,13 +162,14 @@ async function checkAllRoutes() {
     routeListElement.insertBefore(progressElement, routeListElement.firstChild);
 
     const results = [];
-    let allRoutesErrored = true;
+    let completedRoutes = 0;
 
-    for (let i = 0; i < destinations.length; i++) {
-      const destination = destinations[i];
+    const updateProgress = () => {
+      progressElement.textContent = `Checked ${completedRoutes} of ${destinations.length} routes...`;
+    };
+
+    const routePromises = destinations.map(async (destination) => {
       try {
-        progressElement.textContent = `Checking route ${i + 1} of ${destinations.length}, please wait...`;
-
         const result = await checkRoute(origin, destination, selectedDate);
         if (result && result.flightsOutbound && result.flightsOutbound.length > 0) {
           const flight = result.flightsOutbound[0];
@@ -177,16 +180,20 @@ async function checkAllRoutes() {
             arrival: `${flight.arrival} (${flight.arrivalOffsetText})`,
             duration: flight.duration
           });
-          allRoutesErrored = false;
         }
       } catch (error) {
         console.error(`Error processing ${origin} to ${destination} on ${selectedDate}:`, error.message);
+      } finally {
+        completedRoutes++;
+        updateProgress();
       }
-    }
+    });
+
+    await Promise.all(routePromises);
 
     progressElement.remove();
 
-    if (allRoutesErrored) {
+    if (results.length === 0) {
       routeListElement.innerHTML = `<p class="is-size-4 has-text-centered">No flights available for ${selectedDate}.</p>`;
     } else {
       results.filter(result => result !== null).forEach(flightInfo => {
