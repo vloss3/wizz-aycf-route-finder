@@ -5,10 +5,7 @@ async function fetchDestinations(origin) {
     chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
       const currentTab = tabs[0];
       if (currentTab.url.includes('multipass.wizzair.com')) {
-        chrome.tabs.sendMessage(currentTab.id, {action: "getDestinations", origin: origin}, function(response) {
-          if (chrome.runtime.lastError) {
-            reject(chrome.runtime.lastError);
-          } else if (response && response.destinations) {
+        chrome.tabs.sendMessage(currentTab.id, {action: "getDestinations", origin: origin}, function(response) {if (response && response.destinations) {
             resolve(response.destinations);
           } else if (response && response.error) {
             reject(new Error(response.error));
@@ -87,6 +84,34 @@ async function checkRoute(origin, destination, date) {
   }
 }
 
+function cacheKey(origin, date) {
+  return `${origin}-${date}`;
+}
+
+function setCachedResults(key, results) {
+  const cacheData = {
+    results: results,
+    timestamp: Date.now()
+  };
+  localStorage.setItem(key, JSON.stringify(cacheData));
+}
+
+function getCachedResults(key) {
+  const cachedData = localStorage.getItem(key);
+  if (cachedData) {
+    const { results, timestamp } = JSON.parse(cachedData);
+    const thirtyMinutesInMs = 30 * 60 * 1000;
+    if (Date.now() - timestamp < thirtyMinutesInMs) {
+      return results;
+    }
+  }
+  return null;
+}
+
+function clearCache(key) {
+  localStorage.removeItem(key);
+}
+
 async function checkAllRoutes() {
   console.log('checkAllRoutes started');
   const originInput = document.getElementById('airport-input');
@@ -99,6 +124,24 @@ async function checkAllRoutes() {
     return;
   }
 
+  const cacheKey = `${origin}-${selectedDate}`;
+  const cachedResults = getCachedResults(cacheKey);
+
+  if (cachedResults) {
+    console.log('Using cached results');
+    displayResults({ [selectedDate]: cachedResults });
+    const routeListElement = document.querySelector('.route-list');
+    const cacheNotification = document.createElement('div');
+    cacheNotification.textContent = 'Using cached results. Click the "Refresh Cache" button to fetch new data.';
+    cacheNotification.style.backgroundColor = '#e6f7ff';
+    cacheNotification.style.border = '1px solid #91d5ff';
+    cacheNotification.style.borderRadius = '4px';
+    cacheNotification.style.padding = '10px';
+    cacheNotification.style.marginBottom = '15px';
+    routeListElement.insertBefore(cacheNotification, routeListElement.firstChild);
+    return;
+  }
+
   const flightsByDate = {};
 
   const routeListElement = document.querySelector('.route-list');
@@ -108,8 +151,7 @@ async function checkAllRoutes() {
   }
 
   try {
-    // const destinations = await fetchDestinations(origin);
-    const destinations = ['DXB', 'ATH'];
+    const destinations = await fetchDestinations(origin);
     console.log('Fetched destinations:', destinations);
 
     const progressElement = document.createElement('div');
@@ -140,10 +182,6 @@ async function checkAllRoutes() {
       } catch (error) {
         console.error(`Error processing ${origin} to ${destination} on ${selectedDate}:`, error.message);
       }
-
-      if (i < destinations.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 800));
-      }
     }
 
     progressElement.remove();
@@ -158,6 +196,7 @@ async function checkAllRoutes() {
         flightsByDate[selectedDate].push(flightInfo);
       });
 
+      setCachedResults(cacheKey, flightsByDate[selectedDate]);
       displayResults(flightsByDate);
     }
   } catch (error) {
@@ -197,10 +236,33 @@ function displayResults(flightsByDate) {
         year: 'numeric'
       });
       
-      dateHeader.textContent = formattedDate;
+      dateHeader.style.display = 'flex';
+      dateHeader.style.justifyContent = 'space-between';
+      dateHeader.style.alignItems = 'center';
       dateHeader.style.backgroundColor = '#f0f0f0';
       dateHeader.style.padding = '10px';
       dateHeader.style.borderRadius = '5px';
+
+      const dateText = document.createElement('span');
+      dateText.textContent = formattedDate;
+      dateHeader.appendChild(dateText);
+
+      const clearCacheButton = document.createElement('button');
+      clearCacheButton.textContent = '♻️ Refresh Cache';
+      clearCacheButton.style.padding = '5px 10px';
+
+      clearCacheButton.style.fontSize = '12px';
+      clearCacheButton.style.backgroundColor = '#f0f0f0';
+      clearCacheButton.style.border = '1px solid #ccc';
+      clearCacheButton.style.borderRadius = '3px';
+      clearCacheButton.style.cursor = 'pointer';
+      clearCacheButton.addEventListener('click', () => {
+        const origin = document.getElementById('airport-input').value.toUpperCase();
+        const cacheKey = `${origin}-${date}`;
+        clearCache(cacheKey);
+      });
+
+      dateHeader.appendChild(clearCacheButton);
       resultsDiv.appendChild(dateHeader);
 
       const flightList = document.createElement('ul');
