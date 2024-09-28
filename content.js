@@ -62,3 +62,38 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     return true;
   }
 });
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "getDynamicUrl") {
+    setTimeout(() => {
+      const pageContent = document.head.innerHTML;
+      const match = pageContent.match(/"searchFlight":"https:\/\/multipass\.wizzair\.com[^"]+\/([^"]+)"/);
+      if (match && match[1]) {
+        const uuid = match[1];
+        const dynamicUrl = `https://multipass.wizzair.com/w6/subscriptions/json/availability/${uuid}`;
+        sendResponse({dynamicUrl: dynamicUrl});
+      } else {
+        console.log('Dynamic ID not found in page content');
+        sendResponse({error: "Dynamic ID not found"});
+      }
+    }, 1000);
+    return true;
+  }
+});
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "getHeaders") {
+    const headers = {};
+    performance.getEntriesByType("resource").forEach(entry => {
+      if (entry.name.includes("multipass.wizzair.com")) {
+        entry.serverTiming.forEach(timing => {
+          if (timing.name.startsWith("request_header_")) {
+            const headerName = timing.name.replace("request_header_", "");
+            headers[headerName] = timing.description;
+          }
+        });
+      }
+    });
+    sendResponse({headers: headers});
+  }
+});

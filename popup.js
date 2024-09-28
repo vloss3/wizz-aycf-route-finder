@@ -28,41 +28,63 @@ function getDynamicUrl() {
   return new Promise((resolve, reject) => {
     chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
       const currentTab = tabs[0];
-      if (currentTab.url.includes('multipass.wizzair.com')) {
-        const urlParts = currentTab.url.split('/');
-        const uuid = urlParts[urlParts.length - 1];
-        resolve(`https://multipass.wizzair.com/w6/subscriptions/json/availability/${uuid}`);
-      } else {
-        reject(new Error("Not on the Wizzair Multipass page"));
-      }
+      chrome.tabs.sendMessage(currentTab.id, {action: "getDynamicUrl"}, function(response) {
+        if (chrome.runtime.lastError) {
+          reject(chrome.runtime.lastError);
+        } else if (response && response.dynamicUrl) {
+          resolve(response.dynamicUrl);
+        } else if (response && response.error) {
+          reject(new Error(response.error));
+        } else {
+          reject(new Error("Failed to get dynamic URL"));
+        }
+      });
     });
   });
 }
 
 async function checkRoute(origin, destination, date) {
-  const dynamicUrl = await getDynamicUrl();
-  
-  const headers = await new Promise((resolve) => {
-    chrome.runtime.sendMessage({action: "getHeaders"}, (response) => {
-      resolve(response.headers);
+  try {
+    const dynamicUrl = await getDynamicUrl();
+
+    const data = {
+      flightType: 'OW',
+      origin: origin,
+      destination: destination,
+      departure: date,
+      arrival: '',
+      intervalSubtype: null
+    };
+
+    const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
+    
+    const response = await new Promise((resolve) => {
+      chrome.tabs.sendMessage(tab.id, {action: "getHeaders"}, resolve);
     });
-  });
 
-  const data = {
-    flightType: 'OW',
-    origin: origin,
-    destination: destination,
-    departure: date,
-    arrival: '',
-    intervalSubtype: null
-  };
+    if (!response || !response.headers) {
+      throw new Error("Failed to get headers from the page");
+    }
 
-  const response = await fetch(dynamicUrl, {
-    method: 'POST',
-    headers: headers,
-    body: JSON.stringify(data)
-  });
-  return response.json();
+    const headers = response.headers;
+
+    headers['Content-Type'] = 'application/json';
+
+    const fetchResponse = await fetch(dynamicUrl, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(data)
+    });
+
+    if (!fetchResponse.ok) {
+      throw new Error(`HTTP error! status: ${fetchResponse.status}`);
+    }
+
+    return fetchResponse.json();
+  } catch (error) {
+    console.error('Error in checkRoute:', error);
+    throw error;
+  }
 }
 
 async function checkAllRoutes() {
@@ -86,7 +108,8 @@ async function checkAllRoutes() {
   }
 
   try {
-    const destinations = await fetchDestinations(origin);
+    // const destinations = await fetchDestinations(origin);
+    const destinations = ['DXB', 'ATH'];
     console.log('Fetched destinations:', destinations);
 
     const progressElement = document.createElement('div');
@@ -94,38 +117,49 @@ async function checkAllRoutes() {
     progressElement.style.marginBottom = '10px';
     routeListElement.insertBefore(progressElement, routeListElement.firstChild);
 
-    const results = await Promise.all(destinations.map(async (destination, index) => {
+    const results = [];
+    let allRoutesErrored = true;
+
+    for (let i = 0; i < destinations.length; i++) {
+      const destination = destinations[i];
       try {
-        progressElement.textContent = `Checking ${destinations.length} routes, please wait...`;
+        progressElement.textContent = `Checking route ${i + 1} of ${destinations.length}, please wait...`;
 
         const result = await checkRoute(origin, destination, selectedDate);
         if (result && result.flightsOutbound && result.flightsOutbound.length > 0) {
           const flight = result.flightsOutbound[0];
-          return {
+          results.push({
             route: `${origin} (${flight.departureStationText}) to ${destination} (${flight.arrivalStationText})`,
             date: flight.departureDate,
             departure: `${flight.departure} (${flight.departureOffsetText})`,
             arrival: `${flight.arrival} (${flight.arrivalOffsetText})`,
             duration: flight.duration
-          };
+          });
+          allRoutesErrored = false;
         }
-        return null;
       } catch (error) {
         console.error(`Error processing ${origin} to ${destination} on ${selectedDate}:`, error.message);
-        return null;
       }
-    }));
+
+      if (i < destinations.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 800));
+      }
+    }
 
     progressElement.remove();
 
-    results.filter(result => result !== null).forEach(flightInfo => {
-      if (!flightsByDate[selectedDate]) {
-        flightsByDate[selectedDate] = [];
-      }
-      flightsByDate[selectedDate].push(flightInfo);
-    });
+    if (allRoutesErrored) {
+      routeListElement.innerHTML = `<p class="is-size-4 has-text-centered">No flights available for ${selectedDate}.</p>`;
+    } else {
+      results.filter(result => result !== null).forEach(flightInfo => {
+        if (!flightsByDate[selectedDate]) {
+          flightsByDate[selectedDate] = [];
+        }
+        flightsByDate[selectedDate].push(flightInfo);
+      });
 
-    displayResults(flightsByDate);
+      displayResults(flightsByDate);
+    }
   } catch (error) {
     console.error("An error occurred:", error.message);
     routeListElement.innerHTML = `<p>Error: ${error.message}</p>`;
