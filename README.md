@@ -2,9 +2,13 @@
 
 Simple(<1mb) Chrome extension to find all available routes on Wizz AYCF (All-You-Can-Fly).
 
+Get from Chrome Store https://chromewebstore.google.com/detail/aycf-route-finder/ppopfobaaakhcogialemngniimoplcnp
+
 ![Screenshot of the extension in use](screenshot.jpg)
 
-**DISCLAIMER: This extension is not affiliated with Wizz Air in any way. It is a personal project to help Multipass users find available routes easier.**
+**DISCLAIMER: This extension is not affiliated with Wizz Air or its partners in any way. It is a personal project to help Multipass users like me find available routes.**
+
+Please use responsibly and at your own risk. Doing too many searches in a short period of time will result in temporary rate limiting.
 
 No data is collected.
 
