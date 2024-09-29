@@ -27,13 +27,6 @@ To install this Chrome extension:
 
 The extension should now be installed and visible in your Chrome browser, click on the extension icon and make sure it's pinned.
 
-## Usage
-
-1. Go to [https://multipass.wizzair.com/w6/subscriptions/spa/private-page/wallets](https://multipass.wizzair.com/w6/subscriptions/spa/private-page/wallets)
-2. Search any flight, random "from", "to", and "departure date".
-3. Press "Search" button.
-4. Now the extension can be used.
-
 ## License
 
 MIT License, see [LICENSE](LICENSE) file.
