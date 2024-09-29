@@ -2,11 +2,22 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   if (request.action === "getDestinations") {
     setTimeout(() => {
       const routePattern = /"routes":\[(.*?)\].*?"isOneWayFlightsOnly"/gms;
+      const bodyPattern = /window\.CVO\.routes\s*=\s*(\[.*?\]);/s;
       const pageContent = document.head.innerHTML;
-      const match = pageContent.match(routePattern);
-      if (match && match[0]) {
+      const bodyContent = document.body.innerHTML;
+      
+      let routesJson;
+      let headMatch = pageContent.match(routePattern);
+      let bodyMatch = bodyContent.match(bodyPattern);
+
+      if (headMatch && headMatch[0]) {
+        routesJson = `{"routes":${headMatch[0].split('"routes":')[1].split(',"isOneWayFlightsOnly"')[0]}}`;
+      } else if (bodyMatch && bodyMatch[1]) {
+        routesJson = `{"routes":${bodyMatch[1]}}`;
+      }
+
+      if (routesJson) {
         try {
-          const routesJson = `{"routes":${match[0].split('"routes":')[1].split(',"isOneWayFlightsOnly"')[0]}}`;
           const routesData = JSON.parse(routesJson);
 
           const originAirport = request.origin;
@@ -36,14 +47,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "getDynamicUrl") {
     setTimeout(() => {
       const pageContent = document.head.innerHTML;
-      const match = pageContent.match(/"searchFlight":"https:\/\/multipass\.wizzair\.com[^"]+\/([^"]+)"/);
-      if (match && match[1]) {
-        const uuid = match[1];
+      const bodyContent = document.body.innerHTML;
+      
+      const headMatch = pageContent.match(/"searchFlight":"https:\/\/multipass\.wizzair\.com[^"]+\/([^"]+)"/);
+      const bodyMatch = bodyContent.match(/window\.CVO\.flightSearchUrlJson\s*=\s*"(https:\/\/multipass\.wizzair\.com[^"]+)"/);
+
+      if (headMatch && headMatch[1]) {
+        const uuid = headMatch[1];
         const dynamicUrl = `https://multipass.wizzair.com/w6/subscriptions/json/availability/${uuid}`;
         sendResponse({dynamicUrl: dynamicUrl});
+      } else if (bodyMatch && bodyMatch[1]) {
+        const dynamicUrl = bodyMatch[1];
+        sendResponse({dynamicUrl: dynamicUrl});
       } else {
-        console.log('Dynamic ID not found in page content');
-        sendResponse({error: "Dynamic ID not found"});
+        console.log('Dynamic URL not found in page content');
+        sendResponse({error: "Dynamic URL not found"});
       }
     }, 1000);
     return true;
