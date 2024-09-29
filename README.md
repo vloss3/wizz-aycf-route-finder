@@ -16,7 +16,7 @@ No data is collected.
 
 To install this Chrome extension:
 
-1. Download [https://github.com/vloss3/wizz-aycf-route-finder/archive/refs/tags/1.1.1.zip](https://github.com/vloss3/wizz-aycf-route-finder/archive/refs/tags/1.1.1.zip)
+1. Download [https://github.com/vloss3/wizz-aycf-route-finder/archive/refs/tags/1.1.2.zip](https://github.com/vloss3/wizz-aycf-route-finder/archive/refs/tags/1.1.2.zip)
 
 2. Unzip the file.
 
