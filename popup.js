@@ -103,8 +103,8 @@ function getCachedResults(key) {
   const cachedData = localStorage.getItem(key);
   if (cachedData) {
     const { results, timestamp } = JSON.parse(cachedData);
-    const thirtyMinutesInMs = 30 * 60 * 1000;
-    if (Date.now() - timestamp < thirtyMinutesInMs) {
+    const twoHoursInMs = 2 * 60 * 60 * 1000;
+    if (Date.now() - timestamp < twoHoursInMs) {
       return results;
     }
   }
