@@ -79,7 +79,8 @@ async function checkRoute(origin, destination, date) {
       throw new Error(`HTTP error! status: ${fetchResponse.status}`);
     }
 
-    return fetchResponse.json();
+    const responseData = await fetchResponse.json();
+    return responseData.flightsOutbound || [];
   } catch (error) {
     console.error('Error in checkRoute:', error);
     throw error;
@@ -170,15 +171,17 @@ async function checkAllRoutes() {
 
     const routePromises = destinations.map(async (destination) => {
       try {
-        const result = await checkRoute(origin, destination, selectedDate);
-        if (result && result.flightsOutbound && result.flightsOutbound.length > 0) {
-          const flight = result.flightsOutbound[0];
-          results.push({
-            route: `${origin} (${flight.departureStationText}) to ${destination} (${flight.arrivalStationText})`,
-            date: flight.departureDate,
-            departure: `${flight.departure} (${flight.departureOffsetText})`,
-            arrival: `${flight.arrival} (${flight.arrivalOffsetText})`,
-            duration: flight.duration
+        const flights = await checkRoute(origin, destination, selectedDate);
+        if (flights && flights.length > 0) {
+          flights.forEach(flight => {
+            results.push({
+              route: `${origin} (${flight.departureStationText}) to ${destination} (${flight.arrivalStationText})`,
+              date: flight.departureDate,
+              departure: `${flight.departure} (${flight.departureOffsetText})`,
+              arrival: `${flight.arrival} (${flight.arrivalOffsetText})`,
+              duration: flight.duration,
+              flightCode: flight.flightCode
+            });
           });
         }
       } catch (error) {
@@ -288,6 +291,12 @@ function displayResults(flightsByDate) {
         routeDiv.style.fontWeight = 'bold';
         routeDiv.style.marginBottom = '5px';
 
+        const flightCodeDiv = document.createElement('div');
+        flightCodeDiv.textContent = flight.flightCode;
+        flightCodeDiv.style.fontSize = '0.825rem';
+        flightCodeDiv.style.color = '#1d1d1d';
+        flightCodeDiv.style.marginBottom = '5px';
+
         const detailsDiv = document.createElement('div');
         detailsDiv.style.display = 'flex';
         detailsDiv.style.justifyContent = 'space-between';
@@ -306,6 +315,7 @@ function displayResults(flightsByDate) {
         detailsDiv.appendChild(durationDiv);
 
         flightItem.appendChild(routeDiv);
+        flightItem.appendChild(flightCodeDiv);
         flightItem.appendChild(detailsDiv);
         flightList.appendChild(flightItem);
       });
