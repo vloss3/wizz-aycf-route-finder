@@ -36,9 +36,16 @@
         <label class="label">Departure Date</label>
         <div class="control">
           <select id="date-select" class="select">
-  
           </select>
         </div>
+      <div class="field mt-2">
+        <div class="control">
+          <label class="checkbox">
+            <input type="checkbox" id="check-returns">
+            Find return flights (for all)
+          </label>
+        </div>
+      </div>
       </div>
       <button id="search-flights" class="button is-link mb-4">Check Routes</button>
     
@@ -50,7 +57,7 @@
     </div>
     <p class="is-size-6 mt-3"><b>Disclaimer:</b> This extension is not affiliated with Wizz Air or its partners in any way. It is a personal project to help Multipass users like me find available routes.</p>
     <p class="is-size-6 mt-3">Please use responsibly and at your own risk. Doing too many searches in a short period of time will result in temporary rate limiting.</p>
-    <p class="is-size-6 mt-3">Version 1.1.5</p>
+    <p class="is-size-6 mt-3">Version 1.2.0</p>
   </section>
   <script src="popup.js"></script>
 </body>

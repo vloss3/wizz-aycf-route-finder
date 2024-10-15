@@ -140,8 +140,10 @@ async function checkAllRoutes() {
   console.log("checkAllRoutes started");
   const originInput = document.getElementById("airport-input");
   const dateSelect = document.getElementById("date-select");
+  const checkReturnsCheckbox = document.getElementById("check-returns");
   const origin = originInput.value.toUpperCase();
   const selectedDate = dateSelect.value;
+  const checkReturns = checkReturnsCheckbox.checked;
 
   if (!origin) {
     alert("Please enter a departure airport code.");
@@ -194,18 +196,19 @@ async function checkAllRoutes() {
       progressElement.textContent = `Checked ${completedRoutes} of ${destinations.length} routes...`;
     };
 
-    const routePromises = destinations.map(async (destination) => {
+    const routePromises = destinations.map(async (destination, index) => {
       try {
+        await new Promise(resolve => setTimeout(resolve, index * 100));
+
         const flights = await checkRoute(origin, destination, selectedDate);
         if (flights && flights.length > 0) {
           flights.forEach((flight) => {
             results.push({
-              route: `${origin} (${flight.departureStationText}) to ${destination} (${flight.arrivalStationText})`,
+              route: `${origin} (${flight.departureStationText}) to ${destination} (${flight.arrivalStationText}) - ${flight.flightCode}`,
               date: flight.departureDate,
               departure: `${flight.departure} (${flight.departureOffsetText})`,
               arrival: `${flight.arrival} (${flight.arrivalOffsetText})`,
               duration: flight.duration,
-              flightCode: flight.flightCode,
             });
           });
         }
@@ -237,7 +240,16 @@ async function checkAllRoutes() {
         });
 
       setCachedResults(cacheKey, flightsByDate[selectedDate]);
-      displayResults(flightsByDate);
+      await displayResults(flightsByDate, checkReturns);
+
+      if (checkReturns) {
+        const returnPromises = flightsByDate[selectedDate].map(async (flight) => {
+          const returnFlights = await findReturnFlight(flight);
+          const returnCacheKey = `${cacheKey}-return-${flight.route}`;
+          setCachedResults(returnCacheKey, returnFlights);
+        });
+        await Promise.all(returnPromises);
+      }
     }
   } catch (error) {
     console.error("An error occurred:", error.message);
@@ -252,7 +264,7 @@ function formatDate(date) {
   return `${year}-${month}-${day}`;
 }
 
-function displayResults(flightsByDate) {
+function displayResults(flightsByDate, checkReturns) {
   const resultsDiv = document.querySelector(".route-list");
   if (!resultsDiv) {
     console.error("Error: .route-list element not found in the DOM");
@@ -311,23 +323,20 @@ function displayResults(flightsByDate) {
       flightList.style.listStyleType = "none";
       flightList.style.padding = "0";
 
-      flights.forEach((flight) => {
+      for (const flight of flights) {
         const flightItem = document.createElement("li");
         flightItem.style.marginBottom = "15px";
         flightItem.style.padding = "10px";
         flightItem.style.border = "1px solid #ddd";
         flightItem.style.borderRadius = "5px";
+        flightItem.style.display = "flex";
+        flightItem.style.flexDirection = "column";
+        flightItem.style.gap = "5px";
 
         const routeDiv = document.createElement("div");
         routeDiv.textContent = flight.route;
         routeDiv.style.fontWeight = "bold";
         routeDiv.style.marginBottom = "5px";
-
-        const flightCodeDiv = document.createElement("div");
-        flightCodeDiv.textContent = flight.flightCode;
-        flightCodeDiv.style.fontSize = "0.825rem";
-        flightCodeDiv.style.color = "#1d1d1d";
-        flightCodeDiv.style.marginBottom = "5px";
 
         const detailsDiv = document.createElement("div");
         detailsDiv.style.display = "flex";
@@ -347,28 +356,214 @@ function displayResults(flightsByDate) {
         detailsDiv.appendChild(durationDiv);
 
         flightItem.appendChild(routeDiv);
-        flightItem.appendChild(flightCodeDiv);
         flightItem.appendChild(detailsDiv);
+
+        const origin = document.getElementById("airport-input").value.toUpperCase();
+        const returnCacheKey = `${origin}-${date}-return-${flight.route}`;
+        const cachedReturnData = localStorage.getItem(returnCacheKey);
+
+        if (!checkReturns && !cachedReturnData) {
+          const findReturnButton = document.createElement("button");
+          findReturnButton.textContent = "Find Return";
+          findReturnButton.style.width = "100px"
+          findReturnButton.classList.add("button", "is-small", "is-primary", "mt-2", 'has-text-white', 'has-text-weight-bold', 'is-size-7');
+          findReturnButton.addEventListener("click", () => {
+            flight.element = flightItem;
+            findReturnFlight(flight);
+            findReturnButton.remove();
+          });
+          flightItem.appendChild(findReturnButton);
+        } else if (cachedReturnData) {
+          const { results: returnFlights } = JSON.parse(cachedReturnData);
+          flight.element = flightItem;
+          displayReturnFlights(flight, returnFlights);
+        }
+
         flightList.appendChild(flightItem);
-      });
+
+        flight.element = flightItem;
+      }
       resultsDiv.appendChild(flightList);
     }
   }
 }
 
-function displayCacheButton() {
-  const cacheKeys = Object.keys(localStorage).filter((key) =>
-    key.match(/^[A-Z]+-\d{4}-\d{2}-\d{2}$/)
-  );
+async function findReturnFlight(outboundFlight) {
+  const origin = outboundFlight.route.split(" to ")[1].split(" (")[0];
+  const destination = outboundFlight.route.split(" to ")[0].split(" (")[0];
+  const outboundDate = new Date(outboundFlight.date);
+  const outboundArrivalTime = outboundFlight.arrival.split(" (")[0];
 
-  if (cacheKeys.length === 0) {
+  const returnDates = [];
+  for (let i = 0; i < 4; i++) {
+    const date = new Date(outboundDate);
+    date.setDate(outboundDate.getDate() + i);
+    returnDates.push(formatDate(date));
+  }
+
+  const returnFlights = [];
+
+  const progressElement = document.createElement("div");
+  progressElement.classList.add("return-flight-progress");
+  progressElement.style.marginTop = "10px";
+  progressElement.style.fontSize = "0.9em";
+  progressElement.style.color = "#000";
+  outboundFlight.element.appendChild(progressElement);
+
+  let checkedDates = 0;
+  const updateProgress = () => {
+    progressElement.textContent = `Checking return flights: ${checkedDates} of ${returnDates.length} dates checked...`;
+  };
+
+  updateProgress();
+
+  for (const returnDate of returnDates) {
+    console.log(`Checking return flights for ${returnDate}`);
+    try {
+      const flights = await checkRoute(origin, destination, returnDate);
+      if (Array.isArray(flights)) {
+        const validReturnFlights = flights.filter(flight => {
+          const [flightHours, flightMinutes] = flight.departure.split(" (")[0].split(':');
+          const flightDate = new Date(returnDate);
+          flightDate.setHours(parseInt(flightHours, 10), parseInt(flightMinutes, 10), 0, 0);
+
+          const [outboundHours, outboundMinutes] = outboundArrivalTime.split(':');
+          const outboundArrival = new Date(outboundDate);
+          outboundArrival.setHours(parseInt(outboundHours, 10), parseInt(outboundMinutes, 10), 0, 0);
+          return flightDate > outboundArrival;
+        });
+        console.log(`Found ${validReturnFlights.length} valid return flights for ${returnDate}`);
+        returnFlights.push(...validReturnFlights);
+      } else {
+        console.error(`Unexpected response format for ${returnDate}:`, flights);
+      }
+    } catch (error) {
+      console.error(`Error checking return flight for ${returnDate}:`, error);
+    }
+    checkedDates++;
+    updateProgress();
+  }
+
+  progressElement.remove();
+
+  console.log(`Total return flights found: ${returnFlights.length}`);
+  displayReturnFlights(outboundFlight, returnFlights);
+
+  return returnFlights;
+}
+
+function calculateTimeAtDestination(outboundFlight, returnFlight) {
+  const outboundArrival = new Date(`${outboundFlight.date} ${outboundFlight.arrival.split(' (')[0]}`);
+  const returnDeparture = new Date(`${returnFlight.departureDate} ${returnFlight.departure.split(' (')[0]}`);
+  
+  const timeDiff = returnDeparture - outboundArrival;
+  const days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  
+  return `${days} days and ${hours} hours`;
+}
+
+function displayReturnFlights(outboundFlight, returnFlights) {
+  const flightItem = outboundFlight.element;
+  if (!flightItem) {
+    console.error("Flight item element not found");
     return;
   }
 
+  const existingReturnFlights = flightItem.querySelector('.return-flights');
+  if (existingReturnFlights) {
+    existingReturnFlights.remove();
+  }
+
+  const returnFlightsDiv = document.createElement("div");
+  returnFlightsDiv.classList.add("return-flights");
+  returnFlightsDiv.style.marginTop = "15px";
+  returnFlightsDiv.style.borderTop = "2px solid #ddd";
+  returnFlightsDiv.style.paddingTop = "15px";
+
+  const validReturnFlights = returnFlights.filter(flight => {
+    const timeAtDestination = calculateTimeAtDestination(outboundFlight, flight);
+    const [days, hours] = timeAtDestination.split(' and ');
+    return parseInt(days) > 0 || parseInt(hours) >= 1;
+  });
+
+  const header = document.createElement("h4");
+  header.textContent = `Return Flights (${validReturnFlights.length} found)`;
+  header.style.marginBottom = "15px";
+  header.style.fontWeight = "bold";
+  returnFlightsDiv.appendChild(header);
+
+  if (validReturnFlights.length === 0) {
+    const noFlightsMsg = document.createElement("p");
+    noFlightsMsg.textContent = "No valid (>1h until return) flights found within the next 3 days.";
+    noFlightsMsg.style.fontStyle = "italic";
+    returnFlightsDiv.appendChild(noFlightsMsg);
+  } else {
+    const flightList = document.createElement("ul");
+    flightList.style.listStyleType = "none";
+    flightList.style.padding = "0";
+
+    validReturnFlights.forEach(flight => {
+      const returnFlightItem = document.createElement("li");
+      returnFlightItem.style.marginBottom = "15px";
+      returnFlightItem.style.padding = "10px";
+      returnFlightItem.style.border = "1px solid #ddd";
+      returnFlightItem.style.borderRadius = "5px";
+
+      const routeDiv = document.createElement("div");
+      routeDiv.textContent = `${flight.departureStationText || flight.departureStation} to ${flight.arrivalStationText || flight.arrivalStation} - ${flight.flightCode}`;
+      routeDiv.style.fontWeight = "bold";
+      routeDiv.style.marginBottom = "5px";
+
+      const dateDiv = document.createElement("div");
+      dateDiv.textContent = `Date: ${new Date(flight.departureDate).toLocaleDateString()}`;
+      dateDiv.style.fontSize = "0.9rem";
+      dateDiv.style.color = "#4a4a4a";
+      dateDiv.style.marginBottom = "5px";
+
+      const detailsDiv = document.createElement("div");
+      detailsDiv.style.display = "flex";
+      detailsDiv.style.justifyContent = "space-between";
+      detailsDiv.style.fontSize = "0.9em";
+
+      const departureDiv = document.createElement("div");
+      departureDiv.textContent = `✈️ Departure: ${flight.departure} (${flight.departureOffsetText || ''})`;
+
+      const arrivalDiv = document.createElement("div");
+      arrivalDiv.textContent = `🛬 Arrival: ${flight.arrival} (${flight.arrivalOffsetText || ''})`;
+
+      const durationDiv = document.createElement("div");
+      durationDiv.textContent = `⏱️ Duration: ${flight.duration}`;
+
+      const timeAtDestinationDiv = document.createElement("div");
+      const timeAtDestination = calculateTimeAtDestination(outboundFlight, flight);
+      timeAtDestinationDiv.textContent = `🕒 Time until return: ${timeAtDestination}`;
+      timeAtDestinationDiv.style.fontSize = "0.9em";
+      timeAtDestinationDiv.style.color = "#4a4a4a";
+      timeAtDestinationDiv.style.marginTop = "5px";
+
+      detailsDiv.appendChild(departureDiv);
+      detailsDiv.appendChild(arrivalDiv);
+      detailsDiv.appendChild(durationDiv);
+
+      returnFlightItem.appendChild(routeDiv);
+      returnFlightItem.appendChild(dateDiv);
+      returnFlightItem.appendChild(detailsDiv);
+      returnFlightItem.appendChild(timeAtDestinationDiv);
+      flightList.appendChild(returnFlightItem);
+    });
+
+    returnFlightsDiv.appendChild(flightList);
+  }
+
+  flightItem.appendChild(returnFlightsDiv);
+}
+
+function displayCacheButton() {
   const cacheButton = document.createElement("button");
   cacheButton.id = "show-cache";
   cacheButton.textContent = "Show Last Results (2h)";
-  cacheButton.classList.add("button", "is-info", "mb-4", "ml-2");
+  cacheButton.classList.add("button", "has-background-primary", "mb-4", "ml-2", "has-text-white");
 
   const searchFlightsButton = document.getElementById("search-flights");
   searchFlightsButton.parentNode.insertBefore(
@@ -383,23 +578,64 @@ function showCachedResults() {
   const cacheKeys = Object.keys(localStorage).filter((key) =>
     key.match(/^[A-Z]+-\d{4}-\d{2}-\d{2}$/)
   );
+
+  const resultsDiv = document.querySelector(".route-list");
+  resultsDiv.innerHTML = "";
+
+  const headerContainer = document.createElement("div");
+  headerContainer.style.display = "flex";
+  headerContainer.style.justifyContent = "space-between";
+  headerContainer.style.alignItems = "center";
+  headerContainer.style.marginBottom = "4px";
+
+  if (cacheKeys.length !== 0) {
+    const header = document.createElement("h2");
+    header.textContent = "Last Results (2h)";
+    headerContainer.appendChild(header);
+    const clearAllButton = document.createElement("button");
+    clearAllButton.textContent = "Clear All";
+    clearAllButton.classList.add("button", "is-small", "is-danger", "is-light");
+    clearAllButton.addEventListener("click", clearAllCachedResults);
+    headerContainer.appendChild(clearAllButton);
+  }
+
+  resultsDiv.appendChild(headerContainer);
+
   if (cacheKeys.length === 0) {
-    alert("No cached results available.");
+    const noResultsMessage = document.createElement("p");
+    noResultsMessage.textContent = "Searched flights will appear here.";
+    noResultsMessage.style.color = "#0f0f0f";
+    resultsDiv.appendChild(noResultsMessage);
     return;
   }
 
-  const resultsDiv = document.querySelector(".route-list");
-  resultsDiv.innerHTML = "<h3>Last Results (2h)</h3>";
-
   cacheKeys.forEach((key) => {
     const [origin, year, month, day] = key.split("-");
+    const date = new Date(year, month - 1, day);
+    const dayOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][date.getDay()];
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const formattedDate = `${dayOfWeek}, ${monthNames[date.getMonth()]} ${date.getDate()}`;
+
     const button = document.createElement("button");
     button.style.marginTop = "5px";
-    button.textContent = `${origin} - ${year}-${month}-${day}`;
+    button.textContent = `${origin} - ${formattedDate}`;
     button.classList.add("button", "is-small", "is-light", "mr-2", "mb-2");
     button.addEventListener("click", () => displayCachedResult(key));
     resultsDiv.appendChild(button);
   });
+}
+
+function clearAllCachedResults() {
+  const cacheKeys = Object.keys(localStorage).filter((key) =>
+    key.match(/^[A-Z]+-\d{4}-\d{2}-\d{2}$/)
+  );
+  
+  cacheKeys.forEach((key) => {
+    localStorage.removeItem(key);
+  });
+
+  const resultsDiv = document.querySelector(".route-list");
+  resultsDiv.innerHTML = "<p>All cached results have been cleared.</p>";
 }
 
 function displayCachedResult(key) {
@@ -455,6 +691,15 @@ function displayCachedResult(key) {
     resultsDiv.appendChild(cacheInfoDiv);
 
     displayResults({ [date]: results });
+
+    results.forEach(async (flight) => {
+      const returnCacheKey = `${key}-return-${flight.route}`;
+      const cachedReturnData = localStorage.getItem(returnCacheKey);
+      if (cachedReturnData) {
+        const { results: returnFlights } = JSON.parse(cachedReturnData);
+        displayReturnFlights(flight, returnFlights);
+      }
+    });
   } else {
     alert("Cached data not found.");
   }
