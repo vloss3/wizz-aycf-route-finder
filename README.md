@@ -14,7 +14,9 @@ No data is collected.
 
 ## Installation
 
-To install this Chrome extension:
+a) (recommended) Get from Chrome Store https://chromewebstore.google.com/detail/aycf-route-finder/ppopfobaaakhcogialemngniimoplcnp
+
+b) To install this Chrome extension:
 
 1. Download [https://github.com/vloss3/wizz-aycf-route-finder/archive/refs/tags/1.2.0.zip](https://github.com/vloss3/wizz-aycf-route-finder/archive/refs/tags/1.2.0.zip)
 
