@@ -198,7 +198,7 @@ async function checkAllRoutes() {
 
     const routePromises = destinations.map(async (destination, index) => {
       try {
-        await new Promise(resolve => setTimeout(resolve, index * 100));
+        await new Promise((resolve) => setTimeout(resolve, index * 100));
 
         const flights = await checkRoute(origin, destination, selectedDate);
         if (flights && flights.length > 0) {
@@ -243,11 +243,13 @@ async function checkAllRoutes() {
       await displayResults(flightsByDate, checkReturns);
 
       if (checkReturns) {
-        const returnPromises = flightsByDate[selectedDate].map(async (flight) => {
-          const returnFlights = await findReturnFlight(flight);
-          const returnCacheKey = `${cacheKey}-return-${flight.route}`;
-          setCachedResults(returnCacheKey, returnFlights);
-        });
+        const returnPromises = flightsByDate[selectedDate].map(
+          async (flight) => {
+            const returnFlights = await findReturnFlight(flight);
+            const returnCacheKey = `${cacheKey}-return-${flight.route}`;
+            setCachedResults(returnCacheKey, returnFlights);
+          }
+        );
         await Promise.all(returnPromises);
       }
     }
@@ -358,15 +360,25 @@ function displayResults(flightsByDate, checkReturns) {
         flightItem.appendChild(routeDiv);
         flightItem.appendChild(detailsDiv);
 
-        const origin = document.getElementById("airport-input").value.toUpperCase();
+        const origin = document
+          .getElementById("airport-input")
+          .value.toUpperCase();
         const returnCacheKey = `${origin}-${date}-return-${flight.route}`;
         const cachedReturnData = localStorage.getItem(returnCacheKey);
 
         if (!checkReturns && !cachedReturnData) {
           const findReturnButton = document.createElement("button");
           findReturnButton.textContent = "Find Return";
-          findReturnButton.style.width = "100px"
-          findReturnButton.classList.add("button", "is-small", "is-primary", "mt-2", 'has-text-white', 'has-text-weight-bold', 'is-size-7');
+          findReturnButton.style.width = "100px";
+          findReturnButton.classList.add(
+            "button",
+            "is-small",
+            "is-primary",
+            "mt-2",
+            "has-text-white",
+            "has-text-weight-bold",
+            "is-size-7"
+          );
           findReturnButton.addEventListener("click", () => {
             flight.element = flightItem;
             findReturnFlight(flight);
@@ -422,17 +434,32 @@ async function findReturnFlight(outboundFlight) {
     try {
       const flights = await checkRoute(origin, destination, returnDate);
       if (Array.isArray(flights)) {
-        const validReturnFlights = flights.filter(flight => {
-          const [flightHours, flightMinutes] = flight.departure.split(" (")[0].split(':');
+        const validReturnFlights = flights.filter((flight) => {
+          const [flightHours, flightMinutes] = flight.departure
+            .split(" (")[0]
+            .split(":");
           const flightDate = new Date(returnDate);
-          flightDate.setHours(parseInt(flightHours, 10), parseInt(flightMinutes, 10), 0, 0);
+          flightDate.setHours(
+            parseInt(flightHours, 10),
+            parseInt(flightMinutes, 10),
+            0,
+            0
+          );
 
-          const [outboundHours, outboundMinutes] = outboundArrivalTime.split(':');
+          const [outboundHours, outboundMinutes] =
+            outboundArrivalTime.split(":");
           const outboundArrival = new Date(outboundDate);
-          outboundArrival.setHours(parseInt(outboundHours, 10), parseInt(outboundMinutes, 10), 0, 0);
+          outboundArrival.setHours(
+            parseInt(outboundHours, 10),
+            parseInt(outboundMinutes, 10),
+            0,
+            0
+          );
           return flightDate > outboundArrival;
         });
-        console.log(`Found ${validReturnFlights.length} valid return flights for ${returnDate}`);
+        console.log(
+          `Found ${validReturnFlights.length} valid return flights for ${returnDate}`
+        );
         returnFlights.push(...validReturnFlights);
       } else {
         console.error(`Unexpected response format for ${returnDate}:`, flights);
@@ -453,13 +480,19 @@ async function findReturnFlight(outboundFlight) {
 }
 
 function calculateTimeAtDestination(outboundFlight, returnFlight) {
-  const outboundArrival = new Date(`${outboundFlight.date} ${outboundFlight.arrival.split(' (')[0]}`);
-  const returnDeparture = new Date(`${returnFlight.departureDate} ${returnFlight.departure.split(' (')[0]}`);
-  
+  const outboundArrival = new Date(
+    `${outboundFlight.date} ${outboundFlight.arrival.split(" (")[0]}`
+  );
+  const returnDeparture = new Date(
+    `${returnFlight.departureDate} ${returnFlight.departure.split(" (")[0]}`
+  );
+
   const timeDiff = returnDeparture - outboundArrival;
   const days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
-  const hours = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  
+  const hours = Math.floor(
+    (timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+  );
+
   return `${days} days and ${hours} hours`;
 }
 
@@ -470,7 +503,7 @@ function displayReturnFlights(outboundFlight, returnFlights) {
     return;
   }
 
-  const existingReturnFlights = flightItem.querySelector('.return-flights');
+  const existingReturnFlights = flightItem.querySelector(".return-flights");
   if (existingReturnFlights) {
     existingReturnFlights.remove();
   }
@@ -481,9 +514,12 @@ function displayReturnFlights(outboundFlight, returnFlights) {
   returnFlightsDiv.style.borderTop = "2px solid #ddd";
   returnFlightsDiv.style.paddingTop = "15px";
 
-  const validReturnFlights = returnFlights.filter(flight => {
-    const timeAtDestination = calculateTimeAtDestination(outboundFlight, flight);
-    const [days, hours] = timeAtDestination.split(' and ');
+  const validReturnFlights = returnFlights.filter((flight) => {
+    const timeAtDestination = calculateTimeAtDestination(
+      outboundFlight,
+      flight
+    );
+    const [days, hours] = timeAtDestination.split(" and ");
     return parseInt(days) > 0 || parseInt(hours) >= 1;
   });
 
@@ -495,7 +531,8 @@ function displayReturnFlights(outboundFlight, returnFlights) {
 
   if (validReturnFlights.length === 0) {
     const noFlightsMsg = document.createElement("p");
-    noFlightsMsg.textContent = "No valid (>1h until return) flights found within the next 3 days.";
+    noFlightsMsg.textContent =
+      "No valid (>1h until return) flights found within the next 3 days.";
     noFlightsMsg.style.fontStyle = "italic";
     returnFlightsDiv.appendChild(noFlightsMsg);
   } else {
@@ -503,7 +540,7 @@ function displayReturnFlights(outboundFlight, returnFlights) {
     flightList.style.listStyleType = "none";
     flightList.style.padding = "0";
 
-    validReturnFlights.forEach(flight => {
+    validReturnFlights.forEach((flight) => {
       const returnFlightItem = document.createElement("li");
       returnFlightItem.style.marginBottom = "15px";
       returnFlightItem.style.padding = "10px";
@@ -511,12 +548,28 @@ function displayReturnFlights(outboundFlight, returnFlights) {
       returnFlightItem.style.borderRadius = "5px";
 
       const routeDiv = document.createElement("div");
-      routeDiv.textContent = `${flight.departureStationText || flight.departureStation} to ${flight.arrivalStationText || flight.arrivalStation} - ${flight.flightCode}`;
+      routeDiv.textContent = `${
+        flight.departureStationText || flight.departureStation
+      } to ${flight.arrivalStationText || flight.arrivalStation} - ${
+        flight.flightCode
+      }`;
       routeDiv.style.fontWeight = "bold";
       routeDiv.style.marginBottom = "5px";
 
       const dateDiv = document.createElement("div");
-      dateDiv.textContent = `Date: ${new Date(flight.departureDate).toLocaleDateString()}`;
+      const flightDepartureDate = new Date(flight.departureDate);
+      const daysOfWeek = [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+      ];
+      dateDiv.textContent = `Date: ${flightDepartureDate.toLocaleDateString()} (${
+        daysOfWeek[flightDepartureDate.getDay()]
+      })`;
       dateDiv.style.fontSize = "0.9rem";
       dateDiv.style.color = "#4a4a4a";
       dateDiv.style.marginBottom = "5px";
@@ -527,16 +580,23 @@ function displayReturnFlights(outboundFlight, returnFlights) {
       detailsDiv.style.fontSize = "0.9em";
 
       const departureDiv = document.createElement("div");
-      departureDiv.textContent = `✈️ Departure: ${flight.departure} (${flight.departureOffsetText || ''})`;
+      departureDiv.textContent = `✈️ Departure: ${flight.departure} (${
+        flight.departureOffsetText || ""
+      })`;
 
       const arrivalDiv = document.createElement("div");
-      arrivalDiv.textContent = `🛬 Arrival: ${flight.arrival} (${flight.arrivalOffsetText || ''})`;
+      arrivalDiv.textContent = `🛬 Arrival: ${flight.arrival} (${
+        flight.arrivalOffsetText || ""
+      })`;
 
       const durationDiv = document.createElement("div");
       durationDiv.textContent = `⏱️ Duration: ${flight.duration}`;
 
       const timeAtDestinationDiv = document.createElement("div");
-      const timeAtDestination = calculateTimeAtDestination(outboundFlight, flight);
+      const timeAtDestination = calculateTimeAtDestination(
+        outboundFlight,
+        flight
+      );
       timeAtDestinationDiv.textContent = `🕒 Time until return: ${timeAtDestination}`;
       timeAtDestinationDiv.style.fontSize = "0.9em";
       timeAtDestinationDiv.style.color = "#4a4a4a";
@@ -563,7 +623,13 @@ function displayCacheButton() {
   const cacheButton = document.createElement("button");
   cacheButton.id = "show-cache";
   cacheButton.textContent = "Show Last Results (2h)";
-  cacheButton.classList.add("button", "has-background-primary", "mb-4", "ml-2", "has-text-white");
+  cacheButton.classList.add(
+    "button",
+    "has-background-primary",
+    "mb-4",
+    "ml-2",
+    "has-text-white"
+  );
 
   const searchFlightsButton = document.getElementById("search-flights");
   searchFlightsButton.parentNode.insertBefore(
@@ -612,9 +678,32 @@ function showCachedResults() {
   cacheKeys.forEach((key) => {
     const [origin, year, month, day] = key.split("-");
     const date = new Date(year, month - 1, day);
-    const dayOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][date.getDay()];
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const formattedDate = `${dayOfWeek}, ${monthNames[date.getMonth()]} ${date.getDate()}`;
+    const dayOfWeek = [
+      "Sunday",
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+    ][date.getDay()];
+    const monthNames = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+    const formattedDate = `${dayOfWeek}, ${
+      monthNames[date.getMonth()]
+    } ${date.getDate()}`;
 
     const button = document.createElement("button");
     button.style.marginTop = "5px";
@@ -629,7 +718,7 @@ function clearAllCachedResults() {
   const cacheKeys = Object.keys(localStorage).filter((key) =>
     key.match(/^[A-Z]+-\d{4}-\d{2}-\d{2}$/)
   );
-  
+
   cacheKeys.forEach((key) => {
     localStorage.removeItem(key);
   });
