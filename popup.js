@@ -57,7 +57,8 @@ function getDynamicUrl() {
 
 async function checkRoute(origin, destination, date) {
   try {
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    const delay = Math.floor(Math.random() * (300 - 50 + 1)) + 50;
+    await new Promise((resolve) => setTimeout(resolve, delay));
 
     const dynamicUrl = await getDynamicUrl();
 
@@ -101,6 +102,9 @@ async function checkRoute(origin, destination, date) {
     return responseData.flightsOutbound || [];
   } catch (error) {
     console.error("Error in checkRoute:", error);
+    if (error.message.includes("429")) {
+      document.querySelector("#rate-limited-message").style.display = "block";
+    }
     throw error;
   }
 }
@@ -144,7 +148,6 @@ async function checkAllRoutes() {
   const origin = originInput.value.toUpperCase();
   const selectedDate = dateSelect.value;
   const checkReturns = checkReturnsCheckbox.checked;
-  let rateLimited = false;
 
   if (!origin) {
     alert("Please enter a departure airport code.");
@@ -153,6 +156,7 @@ async function checkAllRoutes() {
 
   // Clear previous results
   let routeListElement = document.querySelector(".route-list");
+  document.querySelector("#rate-limited-message").style.display = "none";
   routeListElement.innerHTML = "";
 
   const cacheKey = `${origin}-${selectedDate}`;
@@ -195,8 +199,16 @@ async function checkAllRoutes() {
 
     const results = [];
     let completedRoutes = 0;
+    let isRateLimited = false;
 
     for (const destination of destinations) {
+      if (isRateLimited) break;
+
+      if (completedRoutes > 0 && completedRoutes % 30 === 0) {
+        progressElement.textContent = `Taking a 5 second break to avoid rate limiting...`;
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+
       const updateProgress = () => {
         progressElement.textContent = `Checking ${origin} to ${destination}... ${completedRoutes}/${destinations.length}`;
       };
@@ -231,14 +243,8 @@ async function checkAllRoutes() {
           error.message.includes("429") ||
           error.message.includes("Rate limited")
         ) {
-          rateLimited = true;
-          const errorDiv = document.createElement("div");
-          errorDiv.className = "notification is-danger";
-          errorDiv.innerHTML = `
-            <p class="has-text-weight-bold">${error.message}</p>
-            <p class="mt-2">Search stopped due to rate limiting. Results shown are partial. Please wait a few minutes before searching again.</p>
-          `;
-          routeListElement.insertBefore(errorDiv, progressElement);
+          isRateLimited = true;
+          document.querySelector("#rate-limited-message").style.display = "block";
           break;
         }
       }
@@ -250,21 +256,23 @@ async function checkAllRoutes() {
 
     progressElement.remove();
 
-    if (results.length === 0) {
-      routeListElement.innerHTML = `<p class="is-size-4 has-text-centered">No flights available for ${selectedDate}.</p>`;
-    } else {
-      setCachedResults(cacheKey, flightsByDate[selectedDate]);
-      await displayResults(flightsByDate, checkReturns);
+    if (!isRateLimited) {
+      if (results.length === 0) {
+        routeListElement.innerHTML = `<p class="is-size-4 has-text-centered">No flights available for ${selectedDate}.</p>`;
+      } else {
+        setCachedResults(cacheKey, flightsByDate[selectedDate]);
+        await displayResults(flightsByDate, checkReturns);
 
-      if (checkReturns) {
-        const returnPromises = flightsByDate[selectedDate].map(
-          async (flight) => {
-            const returnFlights = await findReturnFlight(flight);
-            const returnCacheKey = `${cacheKey}-return-${flight.route}`;
-            setCachedResults(returnCacheKey, returnFlights);
-          }
-        );
-        await Promise.all(returnPromises);
+        if (checkReturns) {
+          const returnPromises = flightsByDate[selectedDate].map(
+            async (flight) => {
+              const returnFlights = await findReturnFlight(flight);
+              const returnCacheKey = `${cacheKey}-return-${flight.route}`;
+              setCachedResults(returnCacheKey, returnFlights);
+            }
+          );
+          await Promise.all(returnPromises);
+        }
       }
     }
   } catch (error) {

@@ -13,6 +13,9 @@
       width: 100%;
       max-width: none;
     }
+    #rate-limited-message {
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -21,7 +24,9 @@
       <div class="title">
         <h1 class="is-size-5">Wizz AYCF Route Finder</h1>
         <p class="is-size-7 mt-2">
-          <a href="https://github.com/vloss3/wizz-aycf-route-finder" target="_blank">GitHub</a> | 
+          <a href="https://github.com/vloss3/wizz-aycf-route-finder" target="_blank">GitHub</a> |
+          <a href="https://github.com/vloss3" target="_blank">Follow on GitHub</a> |
+          <a href="https://chromewebstore.google.com/detail/aycf-route-finder/ppopfobaaakhcogialemngniimoplcnp" target="_blank">Chrome Web Store</a> |
           <a href="https://discord.gg/k3eRaSBez4" target="_blank">Feedback (Discord)</a> | 
           <a href="https://ko-fi.com/vloss3/?hidefeed=true&widget=true&embed=true&preview=true" target="_blank">☕️ Tips</a>
         </p>
@@ -48,7 +53,10 @@
       </div>
       </div>
       <button id="search-flights" class="button is-link mb-4">Check Routes</button>
-    
+      <div class="notification is-danger" id="rate-limited-message">
+        <p class="has-text-weight-bold">Rate limited</p>
+        <p class="mt-2">Search stopped due to rate limiting. Results shown are partial. Please wait a few minutes before searching again.</p>
+      </div>
       <div class="route-list">
         <div class="columns is-multiline" id="route-columns">
           <!-- Routes will be dynamically inserted here -->
@@ -57,7 +65,7 @@
     </div>
     <p class="is-size-6 mt-3"><b>Disclaimer:</b> This extension is not affiliated with Wizz Air or its partners in any way. It is a personal project to help Multipass users like me find available routes.</p>
     <p class="is-size-6 mt-3">Please use responsibly and at your own risk. Doing too many searches in a short period of time will result in temporary rate limiting.</p>
-    <p class="is-size-6 mt-3">Version 1.2.0</p>
+    <p class="is-size-6 mt-3">Version 1.3.0 - <a href="https://github.com/vloss3/wizz-aycf-route-finder/releases" target="_blank">Changelog</a> </p>
   </section>
   <script src="popup.js"></script>
 </body>
