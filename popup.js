@@ -144,10 +144,8 @@ async function checkAllRoutes() {
   console.log("checkAllRoutes started");
   const originInput = document.getElementById("airport-input");
   const dateSelect = document.getElementById("date-select");
-  const checkReturnsCheckbox = document.getElementById("check-returns");
   const origin = originInput.value.toUpperCase();
   const selectedDate = dateSelect.value;
-  const checkReturns = checkReturnsCheckbox.checked;
 
   if (!origin) {
     alert("Please enter a departure airport code.");
@@ -230,7 +228,7 @@ async function checkAllRoutes() {
               flightsByDate[selectedDate] = [];
             }
             flightsByDate[selectedDate].push(flightInfo);
-            displayResults(flightsByDate, checkReturns, true);
+            displayResults(flightsByDate, true);
           });
         }
       } catch (error) {
@@ -261,18 +259,7 @@ async function checkAllRoutes() {
         routeListElement.innerHTML = `<p class="is-size-4 has-text-centered">No flights available for ${selectedDate}.</p>`;
       } else {
         setCachedResults(cacheKey, flightsByDate[selectedDate]);
-        await displayResults(flightsByDate, checkReturns);
-
-        if (checkReturns) {
-          const returnPromises = flightsByDate[selectedDate].map(
-            async (flight) => {
-              const returnFlights = await findReturnFlight(flight);
-              const returnCacheKey = `${cacheKey}-return-${flight.route}`;
-              setCachedResults(returnCacheKey, returnFlights);
-            }
-          );
-          await Promise.all(returnPromises);
-        }
+        await displayResults(flightsByDate);
       }
     }
   } catch (error) {
@@ -288,7 +275,7 @@ function formatDate(date) {
   return `${year}-${month}-${day}`;
 }
 
-function displayResults(flightsByDate, checkReturns, append = false) {
+function displayResults(flightsByDate, append = false) {
   const resultsDiv = document.querySelector(".route-list");
   if (!resultsDiv) {
     console.error("Error: .route-list element not found in the DOM");
@@ -403,7 +390,7 @@ function displayResults(flightsByDate, checkReturns, append = false) {
         const returnCacheKey = `${origin}-${date}-return-${flight.route}`;
         const cachedReturnData = localStorage.getItem(returnCacheKey);
 
-        if (!checkReturns && !cachedReturnData) {
+        if (!cachedReturnData) {
           const findReturnButton = document.createElement("button");
           findReturnButton.textContent = "Find Return";
           findReturnButton.style.width = "100px";
