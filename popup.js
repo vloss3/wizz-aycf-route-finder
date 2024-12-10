@@ -57,7 +57,7 @@ function getDynamicUrl() {
 
 async function checkRoute(origin, destination, date) {
   try {
-    const delay = Math.floor(Math.random() * (300 - 50 + 1)) + 50;
+    const delay = Math.floor(Math.random() * (300 - 50 + 1)) + 100;
     await new Promise((resolve) => setTimeout(resolve, delay));
 
     const dynamicUrl = await getDynamicUrl();
@@ -204,9 +204,9 @@ async function checkAllRoutes() {
     for (const destination of destinations) {
       if (isRateLimited) break;
 
-      if (completedRoutes > 0 && completedRoutes % 30 === 0) {
-        progressElement.textContent = `Taking a 5 second break to avoid rate limiting...`;
-        await new Promise(resolve => setTimeout(resolve, 5000));
+      if (completedRoutes > 0 && completedRoutes % 25 === 0) {
+        progressElement.textContent = `Taking a 15 second break to avoid rate limiting...`;
+        await new Promise(resolve => setTimeout(resolve, 15000));
       }
 
       const updateProgress = () => {
