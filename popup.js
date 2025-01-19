@@ -124,11 +124,14 @@ async function checkRoute(origin, destination, date) {
       intervalSubtype: null,
     };
 
-    let headers;
+    let headers = {
+      'Content-Type': 'application/json',
+    };
+
     const oneHourInMs = 60 * 60 * 1000;
     if (pageData.headers && Date.now() - pageData.timestamp < oneHourInMs) {
       console.log("Using cached headers");
-      headers = pageData.headers;
+      headers = { ...headers, ...pageData.headers };
     } else {
       const [tab] = await chrome.tabs.query({
         active: true,
@@ -137,13 +140,12 @@ async function checkRoute(origin, destination, date) {
       const response = await new Promise((resolve) => {
         chrome.tabs.sendMessage(tab.id, { action: "getHeaders" }, resolve);
       });
-      if (!response || !response.headers) {
-        throw new Error("Failed to get headers from the page");
+      if (response && response.headers) {
+        headers = { ...headers, ...response.headers };
+      } else {
+        console.log("Failed to get headers from the page, using defaults");
       }
-      headers = response.headers;
     }
-
-    headers["Content-Type"] = "application/json";
 
     const fetchResponse = await fetch(dynamicUrl, {
       method: "POST",
