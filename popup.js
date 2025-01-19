@@ -1,6 +1,25 @@
 console.log("popup.js loaded");
 
 async function fetchDestinations(origin) {
+  const pageData = localStorage.getItem("wizz_page_data");
+  if (pageData) {
+    const data = JSON.parse(pageData);
+    const oneHourInMs = 60 * 60 * 1000;
+    if (Date.now() - data.timestamp < oneHourInMs && data.routes) {
+      console.log("Using cached routes data");
+      const routesFromOrigin = data.routes.find(
+        (route) => route.departureStation.id === origin
+      );
+      if (routesFromOrigin && routesFromOrigin.arrivalStations) {
+        const destinationIds = routesFromOrigin.arrivalStations.map(
+          (station) => station.id
+        );
+        console.log(`Routes from ${origin}:`, destinationIds);
+        return destinationIds;
+      }
+    }
+  }
+
   return new Promise((resolve, reject) => {
     chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
       const currentTab = tabs[0];
@@ -9,8 +28,25 @@ async function fetchDestinations(origin) {
           currentTab.id,
           { action: "getDestinations", origin: origin },
           function (response) {
-            if (response && response.destinations) {
-              resolve(response.destinations);
+            if (response && response.routes) {
+              const pageData = {
+                routes: response.routes,
+                timestamp: Date.now(),
+              };
+              localStorage.setItem("wizz_page_data", JSON.stringify(pageData));
+
+              const routesFromOrigin = response.routes.find(
+                (route) => route.departureStation.id === origin
+              );
+              if (routesFromOrigin && routesFromOrigin.arrivalStations) {
+                const destinationIds = routesFromOrigin.arrivalStations.map(
+                  (station) => station.id
+                );
+                console.log(`Routes from ${origin}:`, destinationIds);
+                resolve(destinationIds);
+              } else {
+                reject(new Error(`No routes found from ${origin}`));
+              }
             } else if (response && response.error) {
               reject(new Error(response.error));
             } else {
@@ -32,7 +68,17 @@ async function fetchDestinations(origin) {
   });
 }
 
-function getDynamicUrl() {
+async function getDynamicUrl() {
+  const pageData = localStorage.getItem("wizz_page_data");
+  if (pageData) {
+    const data = JSON.parse(pageData);
+    const oneHourInMs = 60 * 60 * 1000;
+    if (Date.now() - data.timestamp < oneHourInMs && data.dynamicUrl) {
+      console.log("Using cached dynamic URL");
+      return data.dynamicUrl;
+    }
+  }
+
   return new Promise((resolve, reject) => {
     chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
       const currentTab = tabs[0];
@@ -43,6 +89,12 @@ function getDynamicUrl() {
           if (chrome.runtime.lastError) {
             reject(chrome.runtime.lastError);
           } else if (response && response.dynamicUrl) {
+            const pageData = JSON.parse(
+              localStorage.getItem("wizz_page_data") || "{}"
+            );
+            pageData.dynamicUrl = response.dynamicUrl;
+            pageData.timestamp = Date.now();
+            localStorage.setItem("wizz_page_data", JSON.stringify(pageData));
             resolve(response.dynamicUrl);
           } else if (response && response.error) {
             reject(new Error(response.error));
@@ -57,10 +109,11 @@ function getDynamicUrl() {
 
 async function checkRoute(origin, destination, date) {
   try {
-    const delay = Math.floor(Math.random() * (300 - 50 + 1)) + 100;
+    const delay = Math.floor(Math.random() * (1000 - 500 + 1)) + 1000;
     await new Promise((resolve) => setTimeout(resolve, delay));
 
     const dynamicUrl = await getDynamicUrl();
+    const pageData = JSON.parse(localStorage.getItem("wizz_page_data") || "{}");
 
     const data = {
       flightType: "OW",
@@ -71,20 +124,24 @@ async function checkRoute(origin, destination, date) {
       intervalSubtype: null,
     };
 
-    const [tab] = await chrome.tabs.query({
-      active: true,
-      currentWindow: true,
-    });
-
-    const response = await new Promise((resolve) => {
-      chrome.tabs.sendMessage(tab.id, { action: "getHeaders" }, resolve);
-    });
-
-    if (!response || !response.headers) {
-      throw new Error("Failed to get headers from the page");
+    let headers;
+    const oneHourInMs = 60 * 60 * 1000;
+    if (pageData.headers && Date.now() - pageData.timestamp < oneHourInMs) {
+      console.log("Using cached headers");
+      headers = pageData.headers;
+    } else {
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      const response = await new Promise((resolve) => {
+        chrome.tabs.sendMessage(tab.id, { action: "getHeaders" }, resolve);
+      });
+      if (!response || !response.headers) {
+        throw new Error("Failed to get headers from the page");
+      }
+      headers = response.headers;
     }
-
-    const headers = response.headers;
 
     headers["Content-Type"] = "application/json";
 
@@ -204,7 +261,7 @@ async function checkAllRoutes() {
 
       if (completedRoutes > 0 && completedRoutes % 25 === 0) {
         progressElement.textContent = `Taking a 15 second break to avoid rate limiting...`;
-        await new Promise(resolve => setTimeout(resolve, 15000));
+        await new Promise((resolve) => setTimeout(resolve, 15000));
       }
 
       const updateProgress = () => {
@@ -242,7 +299,8 @@ async function checkAllRoutes() {
           error.message.includes("Rate limited")
         ) {
           isRateLimited = true;
-          document.querySelector("#rate-limited-message").style.display = "block";
+          document.querySelector("#rate-limited-message").style.display =
+            "block";
           break;
         }
       }
@@ -491,6 +549,7 @@ async function findReturnFlight(outboundFlight) {
     }
     checkedDates++;
     updateProgress();
+    await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 
   progressElement.remove();
@@ -823,6 +882,16 @@ function checkCacheValidity() {
   });
 }
 
+function isPageDataValid() {
+  const pageData = localStorage.getItem("wizz_page_data");
+  if (pageData) {
+    const data = JSON.parse(pageData);
+    const eightHoursInMs = 8 * 60 * 60 * 1000;
+    return Date.now() - data.timestamp < eightHoursInMs;
+  }
+  return false;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   console.log("DOM content loaded");
   checkCacheValidity();
@@ -859,6 +928,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   displayCacheButton();
+
+  if (!isPageDataValid()) {
+    localStorage.removeItem("wizz_page_data");
+  }
 });
 
 document.addEventListener("DOMContentLoaded", function () {

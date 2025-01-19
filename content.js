@@ -19,18 +19,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       if (routesJson) {
         try {
           const routesData = JSON.parse(routesJson);
-
-          const originAirport = request.origin;
-          const routesFromOrigin = routesData.routes.find(route => route.departureStation.id === originAirport);
-
-          if (routesFromOrigin && routesFromOrigin.arrivalStations) {
-            const destinationIds = routesFromOrigin.arrivalStations.map(station => station.id);
-            console.log(`Routes from ${originAirport}:`, destinationIds);
-            sendResponse({ success: true, destinations: destinationIds });
-          } else {
-            console.log(`No routes found from ${originAirport}`);
-            sendResponse({ success: false, error: `No routes found from ${originAirport}` });
-          }
+          sendResponse({ success: true, routes: routesData.routes });
         } catch (error) {
           console.error("Error parsing routes data:", error);
           sendResponse({ success: false, error: "Failed to parse routes data" });
