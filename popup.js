@@ -199,6 +199,13 @@ function clearCache(key) {
 
 async function checkAllRoutes() {
   console.log("checkAllRoutes started");
+
+  const audioCheckbox = document.getElementById("play-audio-checkbox");
+  const audioPlayer = document.getElementById("background-music");
+  if (audioCheckbox.checked && audioPlayer) {
+    audioPlayer.play();
+  }
+
   const originInput = document.getElementById("airport-input");
   const dateSelect = document.getElementById("date-select");
   const origin = originInput.value.toUpperCase();
@@ -233,6 +240,13 @@ async function checkAllRoutes() {
       cacheNotification,
       routeListElement.firstChild
     );
+
+    // Stop and remove audio player when using cached results
+    const audioPlayer = document.getElementById("background-music");
+    if (audioPlayer) {
+      audioPlayer.pause();
+      audioPlayer.remove();
+    }
     return;
   }
 
@@ -319,10 +333,22 @@ async function checkAllRoutes() {
         setCachedResults(cacheKey, flightsByDate[selectedDate]);
         await displayResults(flightsByDate);
       }
+
+      const audioPlayer = document.getElementById("background-music");
+      if (audioPlayer) {
+        audioPlayer.pause();
+        audioPlayer.remove();
+      }
     }
   } catch (error) {
     console.error("An error occurred:", error.message);
     routeListElement.innerHTML = `<p>Error: ${error.message}</p>`;
+
+    const audioPlayer = document.getElementById("background-music");
+    if (audioPlayer) {
+      audioPlayer.pause();
+      audioPlayer.remove();
+    }
   }
 }
 
@@ -801,6 +827,13 @@ function clearAllCachedResults() {
 function displayCachedResult(key) {
   const cachedData = localStorage.getItem(key);
   if (cachedData) {
+    // Stop and remove audio player when displaying cached results
+    const audioPlayer = document.getElementById("background-music");
+    if (audioPlayer) {
+      audioPlayer.pause();
+      audioPlayer.remove();
+    }
+
     const { results, timestamp } = JSON.parse(cachedData);
     const [origin, year, month, day] = key.split("-");
     const date = `${year}-${month}-${day}`;
@@ -898,6 +931,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const checkFlightsButton = document.getElementById("search-flights");
   const routeListElement = document.querySelector(".route-list");
   const airportInput = document.getElementById("airport-input");
+  const audioCheckbox = document.getElementById("play-audio-checkbox");
+
+  audioCheckbox.addEventListener("change", () => {
+    const existingPlayer = document.getElementById("background-music");
+    if (existingPlayer) {
+      existingPlayer.remove();
+    }
+  });
 
   const lastAirport = localStorage.getItem("lastAirport");
   if (lastAirport) {
@@ -916,6 +957,35 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("Check Flights button found");
     checkFlightsButton.addEventListener("click", () => {
       console.log("Check Flights button clicked");
+
+      if (audioCheckbox.checked) {
+        const existingPlayer = document.getElementById("background-music");
+        if (!existingPlayer) {
+          const audioPlayer = document.createElement("audio");
+          audioPlayer.id = "background-music";
+          audioPlayer.controls = true;
+          audioPlayer.loop = true;
+          audioPlayer.style.position = "fixed";
+          audioPlayer.style.bottom = "10px";
+          audioPlayer.style.right = "10px";
+          audioPlayer.style.transform = "none";
+          audioPlayer.style.zIndex = "1000";
+          audioPlayer.style.width = "150px";
+          audioPlayer.style.height = "30px";
+          audioPlayer.controlsList =
+            "nodownload noplaybackrate nofullscreen noremoteplayback";
+          audioPlayer.style.webkitMediaControls = "play current-time";
+
+          const source = document.createElement("source");
+          source.src = "assets/background-music.mp3";
+          source.type = "audio/mpeg";
+
+          audioPlayer.appendChild(source);
+          document.body.appendChild(audioPlayer);
+          audioPlayer.play();
+        }
+      }
+
       checkAllRoutes().catch((error) => {
         console.error("Error in checkAllRoutes:", error);
         if (routeListElement) {
